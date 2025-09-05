@@ -62,19 +62,34 @@ def clean_title(title):
 
 def process_data(data):
     """Process raw data to a csv file."""
-    data = data.dropna()
     if 'book_title' in data.columns:
         data['title'] = data['book_title'].apply(clean_title)
+        data['title'] = data['title'].replace({'nan': None})
     data = data.drop(
         ['index', 'Unnamed: 0.1', 'Unnamed: 0', 'book_title'], axis=1)
+    data = data.dropna(subset=['title', 'author_name'])
+    for column in ['year', 'ratings', 'Rating']:
+        if column in data.columns:
+            data[column] = data[column].astype(str).str.replace(
+                '`', '').str.replace(',', '.').str.strip()
 
+            data[column] = pd.to_numeric(data[column])
+    data = data.dropna()
+    if 'ratings' in data.columns:
+        data = data.sort_values('ratings', ascending=False)
     return data
+
+
+def save_to_file(data):
+    """Save processed data to CSV file."""
+    data.to_csv('PROCESSED_DATA.csv')
 
 
 if __name__ == "__main__":
     args = get_command_line_arguments()
     raw_data = load_csv_file(args.input_file)
-    raw_data = process_data(raw_data)
-    print(raw_data.dtypes)
     authors = author_db()
-    print(merge_databases(authors, raw_data).head())
+    full_data = merge_databases(authors, raw_data)
+    processed = process_data(full_data)
+    save_to_file(processed)
+    print(processed.head())
